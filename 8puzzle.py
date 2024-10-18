@@ -1,59 +1,85 @@
-class Solution:
-   def solve(self, board):
-      dict = {}
-      flatten = []
-      for i in range(len(board)):
-         flatten += board[i]
-      flatten = tuple(flatten)
+import heapq
 
-      dict[flatten] = 0
+class PuzzleState:
+    def __init__(self, board, moves=0, previous=None):
+        self.board = board
+        self.moves = moves
+        self.previous = previous
+        self.zero_pos = board.index(0)
 
-      if flatten == (0, 1, 2, 3, 4, 5, 6, 7, 8):
-         return 0
+    def __lt__(self, other):
+        return (self.moves + self.manhattan_distance()) < (other.moves + other.manhattan_distance())
 
-      return self.get_paths(dict)
+    def manhattan_distance(self):
+        distance = 0
+        for i, value in enumerate(self.board):
+            if value == 0:
+                continue
+            target_x, target_y = divmod(value, 3)
+            current_x, current_y = divmod(i, 3)
+            distance += abs(target_x - current_x) + abs(target_y - current_y)
+        return distance
 
-   def get_paths(self, dict):
-      cnt = 0
-      while True:
-         current_nodes = [x for x in dict if dict[x] == cnt]
-         if len(current_nodes) == 0:
-            return -1
+    def is_goal(self, goal):
+        return self.board == goal
 
-         for node in current_nodes:
-            next_moves = self.find_next(node)
-            for move in next_moves:
-               if move not in dict:
-                  dict[move] = cnt + 1
-               if move == (0, 1, 2, 3, 4, 5, 6, 7, 8):
-                  return cnt + 1
-         cnt += 1
+    def get_neighbors(self):
+        neighbors = []
+        x, y = divmod(self.zero_pos, 3)
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < 3 and 0 <= ny < 3:
+                new_pos = nx * 3 + ny
+                new_board = self.board[:]
+                new_board[self.zero_pos], new_board[new_pos] = new_board[new_pos], new_board[self.zero_pos]
+                neighbors.append(PuzzleState(new_board, self.moves + 1, self))
+        return neighbors
 
-   def find_next(self, node):
-      moves = {
-         0: [1, 3],
-         1: [0, 2, 4],
-         2: [1, 5],
-         3: [0, 4, 6],
-         4: [1, 3, 5, 7],
-         5: [2, 4, 8],
-         6: [3, 7],
-         7: [4, 6, 8],
-         8: [5, 7],
-      }
+def astar_solver(initial, goal):
+    open_list = []
+    closed_set = set()
+    heapq.heappush(open_list, PuzzleState(initial))
+    
+    while open_list:
+        current = heapq.heappop(open_list)
 
-      results = []
-      pos_0 = node.index(0)
-      for move in moves[pos_0]:
-         new_node = list(node)
-         new_node[move], new_node[pos_0] = new_node[pos_0], new_node[move]
-         results.append(tuple(new_node))
+        if current.is_goal(goal):
+            return current
 
-      return results
-ob = Solution()
-matrix = [
-   [3, 1, 2],
-   [4, 7, 5],
-   [6, 8, 0]
-]
-print(ob.solve(matrix))
+        closed_set.add(tuple(current.board))
+
+        for neighbor in current.get_neighbors():
+            if tuple(neighbor.board) in closed_set:
+                continue
+            heapq.heappush(open_list, neighbor)
+
+    return None
+
+def print_solution(solution):
+    path = []
+    while solution:
+        path.append(solution.board)
+        solution = solution.previous
+    path.reverse()
+    
+    for step in path:
+        print_board(step)
+
+def print_board(board):
+    for i in range(0, 9, 3):
+        print(board[i:i+3])
+    print()
+
+if __name__ == "__main__":
+    initial = list(map(int, input("Enter the initial state (9 numbers 0-8): ").split()))
+    goal = list(map(int, input("Enter the goal state (9 numbers 0-8): ").split()))
+    
+    solution = astar_solver(initial, goal)
+    
+    if solution:
+        print("Solution found! Sequence of moves:")
+        print_solution(solution)
+    else:
+        print("No solution found.")
